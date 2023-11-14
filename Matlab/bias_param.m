@@ -7,25 +7,23 @@ clear
 % states: x1=pos, x2=vel, w1=bias
 % calculate ss matricies from parameters, then simulate as ss models.
 
-M1 = 10;   % mass kg
+M1 = 5;    % mass kg
 kv = 0.2;  % viscous damping
 kf = 2.0;  % force constant
 
-w = 2.0;   % external bias
-ref = 10;  % reference position
-Nx = [1; 0];
-
-%% c.t. plant model w/o bias
-% two states: pos, vel 
-A = [0  1
+%% c.t. plant model without bias
+% two states: pos, vel
+% x2d = -(kv/M1) * x2 + (kf/M) * u
+% x1d = x2
+A = [0  1 
      0 -kv/M1];
 B = [0 
-    kf];
+    kf]/M1;
 C = [1 0];
 D = 0;
 sys_plant=ss(A,B,C,D);
 
-%% discrete plant
+%% discrete plant without bias
 % two states: pos, vel
 Ts= 0.10;
 sysd_plant= c2d(sys_plant,Ts);
@@ -35,13 +33,15 @@ Cd = sysd_plant.C;
 Dd = sysd_plant.D;
 
 %% LQR gain for feedback, two states
-Qf = 1.0;
+Qf = [1. 0
+      0  0.1];
 Rf = 1.0;
 [Kgain] = lqr(sysd_plant,Qf,Rf);
 
-%% c.t. estimator model augmented w/ bias 
+%% c.t. estimator model augmented with bias 
+%%
 % 3 states: pos, vel, bias
-Aw = [A B                                  % <<=======
+Aw = [A B                                  % <<======= check this !!!!!
       0 zeros(1,2)]; % dw/dt = 0
 Bw = [B ; 0];
 Cw = [C 0];
@@ -71,14 +71,32 @@ fprintf('co: %i\n', co)
 fprintf('ob: %i\n', ob)
 
 %% LQR gain for estimator Lp
-% computinh eig values of A-LC so,
-% use plant 
-Qe = 1.0;
-Re = 1.0;
-% Ae = 
-% [Lp] = lqr(sysd_plant,Qe,Re);
-
-P= [0.85+0.15i, 0.85-0.15i, 0.60]
+% computing eig values of A-LC
+% using observer
+%
+P= [0.85+0.15i, 0.85-0.15i, 0.40]
 Lp = place(Aob',Cob',P)'
+
+% Ref-feedforward
+Nx = [1.0;0];
+H = [1.0 0];
+% set ref step
+ref = 10.0;
+
+%% Saturation Limits 
+scenario = 2
+if  scenario == 1
+  SAT1=   5.0; % level at which "actuator/driver" saturates
+  SAT2=   5.0; % level at whicrich "processor" output saturates
+  SAT3=   5.0; % level at which  fixed-point-math saturates
+elseif scenario == 2 
+ SAT1=2.70; % Driver/actuator saturation
+ SAT2=2.20; % DAC/PWM saturation
+ SAT3=2.05; % FP saturation
+else
+  print('pick a valid scenario, 1 or 2')
+%% criteria S2 >= S1, and S2 >= S3
+
+end
 
 
